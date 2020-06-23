@@ -1,0 +1,23 @@
+{
+  "name": "skynet-cli",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flanpan/skynet-cli.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/flanpan/skynet-cli/issues"
+  },
+  "homepage": "https://github.com/flanpan/skynet-cli#readme",
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.8.20"
+  }
+}
