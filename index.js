@@ -25,17 +25,22 @@ if (argv.length >= 4) {
   port = parseInt(argv[3]);
 }
 let reqs = [];
+
 function command(cmd) {
   log.setValue(log.getValue() + cmd + "\n");
   sock.write(cmd + "\n");
   reqs.push(cmd);
 }
+function updateScreen() {
+    command("list")
+    command("mem")
+    command("stat")
+}
+
 let sock = net.connect(port, host, () => {
-  reqs.push("first");
-  command("list");
-  command("mem");
-  command("stat");
-});
+  reqs.push("first")
+  updateScreen()
+})
 
 let chunk = "";
 let svc = {};
@@ -75,7 +80,8 @@ const commands = {
   G: "Jump to bottom",
   c: "Sort by CPU",
   m: "Sort by Mem",
-  i: "Input Cmd"
+  i: "Input Cmd",
+  r: "Update Screen"
 };
 let text = "";
 for (const c in commands) {
@@ -238,5 +244,9 @@ input.on("submit", (value) => {
 screen.key("i", () => {
   input.readInput();
 });
+
+screen.key('r', ()=>{
+    updateScreen()
+})
 
 screen.render();
