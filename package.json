@@ -2,16 +2,20 @@
   "name": "skynet-cli",
   "version": "1.0.0",
   "description": "",
+  "preferGlobal": true,
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin":{
+      "sn": "./bin/sn.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/flanpan/skynet-cli.git"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Pan",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/flanpan/skynet-cli/issues"
   },

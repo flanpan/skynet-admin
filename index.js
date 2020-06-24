@@ -49,7 +49,7 @@ let nameMaxLen = 0;
 let totalLuaMem = 0;
 let grid = new contrib.grid({ rows: 12, cols: 12, screen: screen })
 let bar = grid.set(0, 0, 3, 7, contrib.bar, {
-  label: "Top10 lua memory (%)" /*, barWidth:4, barSpacing:6, xOffset:2,*/,
+  label: "Top10 lua memory (%)" , /*barWidth:4,*/ barSpacing:10, /*xOffset:2,*/
   barBgColor: 'green',
   maxHeight: 9,
 })
@@ -66,12 +66,12 @@ let table = grid.set(3, 0, 8, 7, contrib.table, {
   height: "95%",
   order: { type: "line", fg: "cyan" },
   columnSpacing: 5,
-  columnWidth: [12, 30, 8, 6, 6, 6, 6],
+  columnWidth: [12, 30, 10, 6, 6, 6, 6],
 });
 let log = grid.set(3, 7, 7, 5, blessed.textarea, {
   /*fg:'green', selectedfg:'green',*/ label: "Log",style:{scrollbar:{bg:'blue'}}
 });
-let input = grid.set(10, 7, 1, 5, blessed.textbox, { label: "Command (press p to paste service id)" });
+let input = grid.set(10, 7, 1, 5, blessed.textbox, { label: "Command" });
 
 const commands = {
   j: "Down",
@@ -81,6 +81,7 @@ const commands = {
   c: "Sort by CPU",
   m: "Sort by Mem",
   i: "Input Cmd",
+  p: "Paste ID to Cmd",
   r: "Update Screen"
 };
 let text = "";
