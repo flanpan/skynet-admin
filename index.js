@@ -32,28 +32,29 @@ function command(cmd) {
   reqs.push(cmd);
 }
 function updateScreen() {
-    command("list")
-    command("mem")
-    command("stat")
+  command("list");
+  command("mem");
+  command("stat");
 }
 
 let sock = net.connect(port, host, () => {
-  reqs.push("first")
-  updateScreen()
-})
+  reqs.push("first");
+  updateScreen();
+});
 
 let chunk = "";
 let svc = {};
 let svcData = [];
 let nameMaxLen = 0;
 let totalLuaMem = 0;
-let grid = new contrib.grid({ rows: 12, cols: 12, screen: screen })
+let grid = new contrib.grid({ rows: 12, cols: 12, screen: screen });
 let bar = grid.set(0, 0, 3, 7, contrib.bar, {
-  label: "Top10 lua memory (%)" , /*barWidth:4,*/ barSpacing:10, /*xOffset:2,*/
-  barBgColor: 'green',
+  label: "Top10 lua memory (%)",
+  /*barWidth:4,*/ barSpacing: 10 /*xOffset:2,*/,
+  barBgColor: "green",
   maxHeight: 9,
-})
-let svcinfo = grid.set(0, 7, 3, 5, blessed.textarea, {label:'Service info'})
+});
+let svcinfo = grid.set(0, 7, 3, 5, blessed.textarea, { label: "Service info" });
 let table = grid.set(3, 0, 8, 7, contrib.table, {
   keys: true,
   vi: true,
@@ -68,9 +69,7 @@ let table = grid.set(3, 0, 8, 7, contrib.table, {
   columnSpacing: 5,
   columnWidth: [12, 30, 10, 6, 6, 6, 6],
 });
-let log = grid.set(3, 7, 7, 5, blessed.textarea, {
-  /*fg:'green', selectedfg:'green',*/ label: "Log",style:{scrollbar:{bg:'blue'}}
-});
+let log = grid.set(3, 7, 7, 5, blessed.textarea, {label: "Log",style: { scrollbar: { bg: "blue" } }});
 let input = grid.set(10, 7, 1, 5, blessed.textbox, { label: "Command" });
 
 const commands = {
@@ -82,7 +81,7 @@ const commands = {
   m: "Sort by Mem",
   i: "Input Cmd",
   p: "Paste ID to Cmd",
-  r: "Update Screen"
+  r: "Update Screen",
 };
 let text = "";
 for (const c in commands) {
@@ -153,18 +152,23 @@ sock.on("data", (data) => {
     switch (cmd) {
       case "list":
         rows = ret.split("\n");
-        svc = {};
+        let s = new Set();
         rows.forEach((row) => {
           let fields = row.split("\t");
           let id = fields[0];
           if (!id) return;
-          let info = (svc[id] = [0, 0, 0, 0, 0, 0, 0]);
+          svc[id] = svc[id] || [0, 0, 0, 0, 0, 0, 0];
+          let info = svc[id];
           info[FIELD.ID] = id;
+          s.add(id);
           let name = fields[1];
           if (name.length > nameMaxLen) nameMaxLen = name.length;
           info[FIELD.NAME] = name;
           fresh = true;
         });
+        for (let k in svc) {
+          if (!s.has(k)) delete svc[k];
+        }
         break;
       case "mem":
         rows = ret.split("\n");
@@ -202,27 +206,27 @@ sock.on("data", (data) => {
   chunk = "";
 });
 
-table.rows.on('select item',()=>{
-    let info = svcData[table.rows.selected]
-    svcinfo.setValue(`ID: ${info[FIELD.ID]}
+table.rows.on("select item", () => {
+  let info = svcData[table.rows.selected];
+  svcinfo.setValue(`ID: ${info[FIELD.ID]}
 MEM: ${info[FIELD.MEM]} Kb
 CPU: ${info[FIELD.CPU]}
 MSG: ${info[FIELD.MSG]}
 MQLEN: ${info[FIELD.MQLEN]}
 TASK: ${info[FIELD.TASK]}
-NAME: ${info[FIELD.NAME]}`)
-})
+NAME: ${info[FIELD.NAME]}`);
+});
 
 screen.key(["escape", "q", "C-c"], (ch, key) => {
   return process.exit(0);
 });
 
-screen.key('p',()=>{
-    let info = svcData[table.rows.selected]
-    input.setValue(input.getValue() + info[FIELD.ID])
-    screen.render()
-    input.readInput()
-})
+screen.key("p", () => {
+  let info = svcData[table.rows.selected];
+  input.setValue(input.getValue() + info[FIELD.ID]);
+  screen.render();
+  input.readInput();
+});
 
 screen.key(["m"], (ch, key) => {
   svcData.sort((a, b) => b[FIELD.MEM] - a[FIELD.MEM]);
@@ -246,8 +250,8 @@ screen.key("i", () => {
   input.readInput();
 });
 
-screen.key('r', ()=>{
-    updateScreen()
-})
+screen.key("r", () => {
+  updateScreen();
+});
 
 screen.render();

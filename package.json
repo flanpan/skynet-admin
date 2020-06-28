@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/flanpan/skynet-cli.git"
+    "url": "git+https://github.com/flanpan/skynet-admin.git"
   },
   "author": "Pan",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/flanpan/skynet-cli/issues"
+    "url": "https://github.com/flanpan/skynet-admin/issues"
   },
-  "homepage": "https://github.com/flanpan/skynet-cli#readme",
+  "homepage": "https://github.com/flanpan/skynet-admin#readme",
   "dependencies": {
     "blessed": "^0.1.81",
     "blessed-contrib": "^4.8.20"
