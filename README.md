@@ -1,6 +1,6 @@
 # skynet-admin
 Service Management tool of [skynet](https://github.com/cloudwu/skynet)
-
+![sn](https://raw.githubusercontent.com/flanpan/skynet-admin/master/image/sn.jpg)
 ## Install
 ```console
 $ npm install skynet-admin -g

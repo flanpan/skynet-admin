@@ -1,14 +1,14 @@
 {
   "name": "skynet-admin",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.0.1",
+  "description": "Service Management tool of skynet",
   "preferGlobal": true,
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "bin":{
-      "sn": "./bin/sn.js"
+  "bin": {
+    "sn": "./bin/sn.js"
   },
   "repository": {
     "type": "git",

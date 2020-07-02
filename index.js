@@ -27,6 +27,7 @@ if (argv.length >= 4) {
 let reqs = [];
 
 function command(cmd) {
+  if (cmd[0] == "/") return refreshData(cmd.substr(1));
   log.setValue(log.getValue() + cmd + "\n");
   sock.write(cmd + "\n");
   reqs.push(cmd);
@@ -50,7 +51,7 @@ let totalLuaMem = 0;
 let grid = new contrib.grid({ rows: 12, cols: 12, screen: screen });
 let bar = grid.set(0, 0, 3, 7, contrib.bar, {
   label: "Top10 lua memory (%)",
-  /*barWidth:4,*/ barSpacing: 10 /*xOffset:2,*/,
+  /*barWidth:4,*/ barSpacing: 12 /*xOffset:2,*/,
   barBgColor: "green",
   maxHeight: 9,
 });
@@ -69,8 +70,13 @@ let table = grid.set(3, 0, 8, 7, contrib.table, {
   columnSpacing: 5,
   columnWidth: [12, 30, 10, 6, 6, 6, 6],
 });
-let log = grid.set(3, 7, 7, 5, blessed.textarea, {label: "Log",style: { scrollbar: { bg: "blue" } }});
-let input = grid.set(10, 7, 1, 5, blessed.textbox, { label: "Command" });
+let log = grid.set(3, 7, 7, 5, blessed.textarea, {
+  label: "Log  [e - Open with editor]",
+  style: { scrollbar: { bg: "blue" } },
+});
+let input = grid.set(10, 7, 1, 5, blessed.textbox, {
+  label: `Command  [p - Paste ID] [Start with / to match service name]`,
+});
 
 const commands = {
   j: "Down",
@@ -79,9 +85,10 @@ const commands = {
   G: "Jump to bottom",
   c: "Sort by CPU",
   m: "Sort by Mem",
+  n: "Sort by Name",
   i: "Input Cmd",
-  p: "Paste ID to Cmd",
   r: "Update Screen",
+  'Esc/q': "quit"
 };
 let text = "";
 for (const c in commands) {
@@ -105,14 +112,15 @@ function serviceName(name) {
   else return arr[0];
 }
 
-function refreshData() {
+function refreshData(match) {
+  match = match || "";
   svcData = [];
   let memstatistic = {};
   totalLuaMem = 0;
   for (let k in svc) {
     let fields = svc[k];
-    svcData.push(fields);
     let n = serviceName(fields[FIELD.NAME]);
+    if (fields[FIELD.NAME].indexOf(match) >= 0) svcData.push(fields);
     memstatistic[n] = (memstatistic[n] || 0) + fields[FIELD.MEM];
     totalLuaMem += fields[FIELD.MEM];
   }
@@ -217,27 +225,40 @@ TASK: ${info[FIELD.TASK]}
 NAME: ${info[FIELD.NAME]}`);
 });
 
-screen.key(["escape", "q", "C-c"], (ch, key) => {
-  return process.exit(0);
-});
-
-screen.key("p", () => {
-  let info = svcData[table.rows.selected];
-  input.setValue(input.getValue() + info[FIELD.ID]);
-  screen.render();
-  input.readInput();
-});
-
-screen.key(["m"], (ch, key) => {
-  svcData.sort((a, b) => b[FIELD.MEM] - a[FIELD.MEM]);
+function sortDataBy(field) {
+  svcData.sort((a, b) =>
+    typeof a[field] == "string"
+      ? a[field].localeCompare(b[field])
+      : b[field] - a[field]
+  );
   if (svcData.length) table.setData({ headers: HEADER, data: svcData });
   screen.render();
-});
+}
 
-screen.key(["c"], (ch, key) => {
-  svcData.sort((a, b) => b[FIELD.CPU] - a[FIELD.CPU]);
-  if (svcData.length) table.setData({ headers: HEADER, data: svcData });
-  screen.render();
+screen.on("keypress", function (ch, key) {
+  switch (key.name) {
+    case "escape":
+    case "q":
+    case "C-c":
+      return process.exit(0);
+    case "i":
+      return input.readInput();
+    case "r":
+      return updateScreen();
+    case "c":
+      return sortDataBy(FIELD.CPU);
+    case "m":
+      return sortDataBy(FIELD.MEM);
+    case "n":
+      return sortDataBy(FIELD.NAME);
+    case "e":
+      return log.readEditor();
+    case "p":
+      let info = svcData[table.rows.selected];
+      input.setValue(input.getValue() + info[FIELD.ID]);
+      screen.render();
+      return input.readInput();
+  }
 });
 
 input.on("submit", (value) => {
@@ -246,12 +267,6 @@ input.on("submit", (value) => {
   input.readInput();
 });
 
-screen.key("i", () => {
-  input.readInput();
-});
-
-screen.key("r", () => {
-  updateScreen();
-});
+log.on("focus", () => setTimeout(() => log.cancel(), 10));
 
 screen.render();
