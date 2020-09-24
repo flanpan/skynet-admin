@@ -1,14 +1,10 @@
 {
   "name": "skynet-admin",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "Service Management tool of skynet",
-  "preferGlobal": true,
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "bin": {
-    "sn": "./bin/sn.js"
   },
   "repository": {
     "type": "git",
@@ -20,8 +16,5 @@
     "url": "https://github.com/flanpan/skynet-admin/issues"
   },
   "homepage": "https://github.com/flanpan/skynet-admin#readme",
-  "dependencies": {
-    "blessed": "^0.1.81",
-    "blessed-contrib": "^4.8.20"
-  }
+  "dependencies": {}
 }

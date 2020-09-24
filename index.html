@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<title>skynet debug</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.6.4/antd.min.css" />
+<script src="https://unpkg.com/react@16/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/antd/4.6.4/antd-with-locales.min.js"></script>
+
+<style type="stylesheet/css">
+    .editable-cell {
+        position: relative;
+      }
+      
+      .editable-cell-value-wrap {
+        padding: 5px 12px;
+        cursor: pointer;
+      }
+      
+      .editable-row:hover .editable-cell-value-wrap {
+        border: 1px solid #d9d9d9;
+        border-radius: 4px;
+        padding: 4px 11px;
+      }
+      
+      [data-theme='dark'] .editable-row:hover .editable-cell-value-wrap {
+        border: 1px solid #434343;
+      }
+</style>
+
+<script type="text/babel">
+    require("./index")
+    const net = require("net")
+    const config = require('./config')
+    const fs = require('fs')
+    const path = require('path')
+
+    let { ip, port } = {ip:'127.0.0.1', port:8000}
+    let userCfg = localStorage.getItem('config.debug')
+    if(userCfg) {
+        userCfg = JSON.parse(userCfg)
+        ip = userCfg.ip
+        port = userCfg.port
+
+    }
+    
+    const DATA_SEP = "<CMD OK>\n";
+    const PRE_CPU_LEN = "cpu:".length;
+    const PRE_MSG_LEN = "message:".length;
+    const PRE_MQLEN_LEN = "mqlen:".length;
+    const PRE_TASK_LEN = "task:".length;
+    const filter = [
+        "Welcome to skynet console\n",
+        "Invalid command, type help for command list\n<CMD Error>\n",
+        "<CMD Error>\n",
+    ];
+    let { Table, Tag, Space, Button, Drawer, Switch, Input, Popconfirm, Form, Tooltip } = antd;
+    let fields = ['addr', 'name', 'mem_kb', 'cpu', 'msg', 'mqlen', 'task']
+    let columns = fields.map((k) => {
+        return {
+            title: k, dataIndex: k, key: k,
+            sortDirections: ['descend', 'ascend'],
+            sorter: (a, b) => a[k] - b[k],
+        }
+    })
+
+    let reqs = [];
+    let chunk = "";
+    let svc = {};
+    function command(cmd) {
+        sock.write(cmd + "\n");
+        reqs.push(cmd);
+        console.log(cmd)
+    }
+    function updateScreen() {
+        command("list");
+        command("service");
+        command("mem");
+        command("stat");
+    }
+
+    ////////////////////////////////////////////////////////
+    let { useContext, useState, useEffect, useRef } = React
+    function tooltipProps(text) {
+        return {
+            ellipsis: {showTitle: false},
+            render(text) { return <Tooltip placement="topLeft" title={text}>{text}</Tooltip>}
+        }
+    }
+
+    const EditableContext = React.createContext();
+    const EditableRow = ({ index, ...props }) => {
+        const [form] = Form.useForm();
+        return (
+            <Form form={form} component={false}>
+                <EditableContext.Provider value={form}>
+                    <tr {...props} />
+                </EditableContext.Provider>
+            </Form>
+        );
+    };
+
+    const EditableCell = ({ title, editable, children, dataIndex, record, handleSave, ...restProps }) => {
+        const [editing, setEditing] = useState(false);
+        const inputRef = useRef();
+        const form = useContext(EditableContext);
+        useEffect(() => {if (editing) inputRef.current.focus();}, [editing]);
+
+        const toggleEdit = () => {
+            setEditing(!editing);
+            form.setFieldsValue({
+                [dataIndex]: record[dataIndex],
+            });
+        };
+
+        const save = async (e) => {
+            try {
+                const values = await form.validateFields();
+                toggleEdit();
+                handleSave({ ...record, ...values });
+            } catch (errInfo) {
+                console.log('Save failed:', errInfo);
+            }
+        };
+
+        let childNode = children;
+        if (editable) {
+            childNode = editing ? (
+                <Form.Item style={{ margin: 0, }} name={dataIndex} rules={[ { required: true, message: `${title} is required.`, }, ]}>
+                    <Input ref={inputRef} onPressEnter={save} onBlur={save} />
+                </Form.Item>
+            ) : ( <div className="editable-cell-value-wrap" style={{ paddingRight: 24, }} onClick={toggleEdit} > {children} </div> );
+        }
+        return <td {...restProps}>{childNode}</td>;
+    };
+
+    class EditableTable extends React.Component {
+        constructor(props) {
+            super(props);
+            this.state = {
+                filteredInfo: null,
+                dataSource: [],
+            }
+            this.maxKey = 0
+            let { dataSource } = this.state
+            if (config.cmdsPath) {
+                let rows = require(path.join(__dirname,config.cmdsPath))
+                for (let i = 0; i < rows.length; i++) {
+                    let row = rows[i]
+                    dataSource.push(row)
+                    let key = row.key
+                    if (this.maxKey < key)
+                        this.maxKey = key
+                }
+            }
+        }
+
+        sync(data) {
+            if (!config.cmdsPath) return
+            fs.writeFileSync(path.join(__dirname,config.cmdsPath), JSON.stringify(data, 0, 4))
+        }
+
+        getFilters() {
+            let filters = new Set
+            this.state.dataSource.forEach((obj) => {
+                filters.add(obj.type)
+            })
+            let ret = []
+            filters.forEach((t) => { ret.push({ text: t, value: t }) })
+            return ret
+        }
+
+        handleExecute = (cmd) => {
+            if (typeof cmd != 'string') return
+            cmd = cmd.replace('$', this.props.addr)
+            command(cmd)
+        }
+
+        handleDelete = (key) => {
+            const dataSource = [...this.state.dataSource];
+            let data = dataSource.filter((item) => item.key !== key)
+            this.setState({
+                dataSource: data,
+            });
+            this.sync(data)
+        };
+        handleAdd = () => {
+            const { dataSource } = this.state;
+            const newData = {
+                key: ++this.maxKey,
+                type: 'default',
+                name: `show service info`,
+                cmd: 'info $',
+            };
+            let data = [...dataSource, newData]
+            this.setState({
+                dataSource: data,
+            });
+            this.sync(data)
+        };
+        handleSave = (row) => {
+            const newData = [...this.state.dataSource];
+            const index = newData.findIndex((item) => row.key === item.key);
+            const item = newData[index];
+            newData.splice(index, 1, { ...item, ...row });
+            this.setState({ dataSource: newData });
+            this.sync(newData)
+        };
+        handleChange = (pagination, filters, sorter) => {
+            this.setState({ filteredInfo: filters })
+        }
+        render() {
+            const { dataSource } = this.state;
+            const components = {
+                body: { row: EditableRow, cell: EditableCell, },
+            };
+            let filteredValue = null
+            if (this.state.filteredInfo && this.state.filteredInfo.type)
+                filteredValue = this.state.filteredInfo.type
+            let columns = [
+                { title: 'type', dataIndex: 'type', editable: true, filters: this.getFilters(), 
+                    onFilter: (value, record) => { return record.type == value },
+                    filteredValue
+                },
+                { title: 'name', dataIndex: 'name', editable: true},
+                { title: 'cmd', dataIndex: 'cmd', editable: true, ...tooltipProps('cmd')},
+                {
+                    title: 'operation',
+                    dataIndex: 'operation',
+                    render: (text, record) => <Space size="middle">
+                        <Popconfirm title="Sure to delete?" onConfirm={() => this.handleDelete(record.key)}>
+                            <a>Delete</a>
+                        </Popconfirm>
+                        <a onClick={() => this.handleExecute(record.cmd)}>Execute</a>
+                    </Space>
+                },
+            ];
+            columns = columns.map((col) => {
+                if (!col.editable) return col;
+                return { ...col, onCell: (record) => ({
+                        record,
+                        editable: col.editable,
+                        dataIndex: col.dataIndex,
+                        title: col.title,
+                        handleSave: this.handleSave,
+                    }),
+                };
+            });
+            return <div> 
+                <Button onClick={this.handleAdd} type="primary" style={{ marginBottom: 16, }}>Add command</Button>
+                <Tag color="#ffffff"></Tag>
+                <Tag >{`[${this.props.addr}] ${svc[this.props.addr].name}`}</Tag>
+                <Table components={components} rowClassName={() => 'editable-row'} bordered dataSource={dataSource} columns={columns} onChange={this.handleChange} />
+            </div>
+        }
+    }
+
+    ////////////////////////////////////////
+
+    class App extends React.Component {
+        state = { visible: false, searchText: '', searchedColumn: '' };
+        showDrawer = (record) => this.setState({visible: true,record});
+        onClose = () => this.setState({ visible: false, })
+        getColumnSearchProps = dataIndex => ({
+            title: dataIndex, dataIndex, key: dataIndex, sortDirections: ['descend', 'ascend'],
+            sorter: (a, b) => dataIndex == 'addr' ? (a[dataIndex].localeCompare(b[dataIndex])) : (a[dataIndex].length - b[dataIndex].length),
+            filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
+                <div style={{ padding: 8 }}>
+                    <Input
+                        ref={node => {
+                            this.searchInput = node;
+                        }}
+                        placeholder={`Search ${dataIndex}`}
+                        value={selectedKeys[0]}
+                        onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+                        onPressEnter={() => this.handleSearch(selectedKeys, confirm, dataIndex)}
+                        style={{ width: 188, marginBottom: 8, display: 'block' }}
+                    />
+                    <Space>
+                        <Button type="primary" onClick={() => this.handleSearch(selectedKeys, confirm, dataIndex)} size="small" style={{ width: 90 }} >Search</Button>
+                        <Button onClick={() => this.handleReset(clearFilters)} size="small" style={{ width: 90 }}>Reset</Button>
+                    </Space>
+                </div>
+            ),
+            onFilter: (value, record) =>
+                record[dataIndex]
+                    ? record[dataIndex].toString().toLowerCase().includes(value.toLowerCase())
+                    : '',
+            onFilterDropdownVisibleChange: visible => {
+                if (visible) {
+                    setTimeout(() => this.searchInput.select(), 100);
+                }
+            },
+            render: (text, record, index) => {
+                if (dataIndex == 'addr') return <a onClick={() => { this.showDrawer(record) }}>{text}</a>
+                else return text
+            }
+        });
+
+        handleSearch = (selectedKeys, confirm, dataIndex) => {
+            confirm();
+            this.setState({
+                searchText: selectedKeys[0],
+                searchedColumn: dataIndex,
+            });
+        };
+
+        handleReset = clearFilters => {
+            clearFilters();
+            this.setState({ searchText: '' });
+        };
+
+        render() {
+            let data = []
+            for (let k in svc)
+                data.push(svc[k])
+            let col0 = this.getColumnSearchProps('addr')
+            col0.width = 100
+            col0.fixed = 'left'
+            columns[0] = col0
+            columns[1] = this.getColumnSearchProps('name')
+            return <div>
+                <Space style={{ margin: 16 }}>
+                    <Button onClick={() => { command('list');command('service');command('mem');command('stat'); }}>refresh</Button>
+                    <Button onClick={() => { command('gc') }}>gc</Button>
+                    <Button onClick={() => { command('netstat') }}>netstat</Button>
+                    <Switch checkedChildren="profactive" unCheckedChildren="profactive" onChange={(checked) => { command(`profactive ${checked ? 'on' : 'off'}`) }} />
+                </Space>
+                <Table columns={columns} dataSource={data} style={{ margin: 5 }} /*pagination={false} scroll={{ y: 1000 }}*/ />
+                <Drawer width="80%" placement="right" closable={false} onClose={this.onClose} visible={this.state.visible} >
+                    <EditableTable addr={this.state.record ? this.state.record.addr : ''} />
+                </Drawer>
+            </div>
+        }
+    }
+    function render() {
+        ReactDOM.render(<App />, document.body);
+    }
+    let sock = net.connect(port, ip, () => {
+        reqs.push("first");
+        updateScreen();
+    });
+    sock.on('error', (err) => console.error(err))
+    sock.on('close', () => console.log('socket closed.'))
+    sock.on("data", (data) => {
+        let str = data.toString("utf-8");
+        chunk += str;
+        filter.forEach((s) => {
+            chunk = chunk.replace(s, DATA_SEP);
+        });
+        if (chunk.substr(-DATA_SEP.length) != DATA_SEP) return;
+        console.log(chunk)
+        let rets = chunk.split(DATA_SEP);
+        for (let i = 0; i < rets.length - 1; i++) {
+            let ret = rets[i];
+            let cmd = reqs.shift();
+            cmd = cmd.toLowerCase();
+            let rows;
+            switch (cmd) {
+                case "list":
+                    rows = ret.split("\n");
+                    let s = new Set();
+                    rows.forEach((row) => {
+                        let fields = row.split("\t");
+                        let id = fields[0];
+                        if (!id) return;
+                        svc[id] = svc[id] || {}
+                        let info = svc[id];
+                        info.addr = id;
+                        s.add(id);
+                        let name = fields[1];
+                        info.name = name;
+                    });
+                    for (let k in svc) {
+                        if (!s.has(k)) delete svc[k];
+                    }
+                    break;
+                case "gc":
+                case "mem":
+                    rows = ret.split("\n");
+                    rows.forEach((row) => {
+                        let fields = row.split("\t");
+                        let id = fields[0];
+                        if (!id) return;
+                        let info = svc[id];
+                        if (!info) return;
+                        let arr = fields[1].split(" ");
+                        info.mem_kb = parseFloat(parseFloat(arr[0]).toFixed(2));
+                    });
+                    break;
+                case "stat":
+                    rows = ret.split("\n");
+                    rows.forEach((row) => {
+                        let fields = row.split("\t");
+                        let id = fields[0];
+                        if (!id) return;
+                        let info = svc[id];
+                        if (!info) return;
+                        info.cpu = parseFloat(
+                            parseFloat(fields[1].substr(PRE_CPU_LEN)).toFixed(2)
+                        );
+                        info.msg = parseFloat(fields[2].substr(PRE_MSG_LEN));
+                        info.mqlen = parseFloat(fields[3].substr(PRE_MQLEN_LEN));
+                        info.task = parseFloat(fields[4].substr(PRE_TASK_LEN));
+                    });
+                    break;
+                case "service":
+                    rows = ret.split("\n");
+                    rows.forEach((row) => {
+                        let fields = row.split("\t");
+                        let address = fields[1];
+                        if (!address) return;
+                        let info = svc[address];
+                        if (!info) return;
+                        info.name = '[UNIQUE] ' + info.name
+                    });
+                    break;
+                case "netstat":
+                    rows = ret.split("\n");
+                    let info = []
+                    let listenInfo = []
+                    rows.forEach((row) => {
+                        let fields = row.split("\t");
+                        if (fields.length < 2) return
+                        let obj = {}
+                        for(let i = 1;i<fields.length;i++) {
+                            let field = fields[i]
+                            let idx = field.indexOf(':')
+                            let k = field.substr(0,idx)
+                            let v = field.substr(idx+1)
+                            obj[k] = v
+                        }
+                        let s = svc[obj.address]
+                        if(s) obj.desc = s.name
+                        if (obj.type =='LISTEN') listenInfo.push(obj)
+                        else info.push(obj)
+                    });
+                    if(info.length) console.table(info)
+                    if(listenInfo.length) console.table(listenInfo)
+                    break;
+                default:
+                    break;
+            }
+            if (cmd == 'stat' || cmd == 'gc')
+                render()
+        }
+        chunk = "";
+    });
+</script>
+
+</html>

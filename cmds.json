@@ -1,0 +1,14 @@
+[
+    {
+        "key": 1,
+        "type": "default",
+        "name": "占位符$表示当前服务地址",
+        "cmd": "info $"
+    },
+    {
+        "key": 2,
+        "type": "default",
+        "name": "gc",
+        "cmd": "gc"
+    }
+]

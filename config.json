@@ -1,0 +1,7 @@
+{
+    "hosts": {
+        "localhost":{ "ip":"127.0.0.1", "debugPort":{"server1":8000,"server2":8001} },
+        "测试服":{ "ip":"127.0.0.1", "debugPort":{"登录服":8000,"游戏服":8001} }
+    },
+    "cmdsPath": "cmds.json"
+}
