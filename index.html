@@ -293,6 +293,7 @@
             },
             render: (text, record, index) => {
                 if (dataIndex == 'addr') return <a onClick={() => { this.showDrawer(record) }}>{text}</a>
+                if (dataIndex == 'name') return `${svc[record.addr].unique? '[UNIQUE] ':''}${record.name}`
                 else return text
             }
         });
@@ -340,7 +341,9 @@
         reqs.push("first");
         updateScreen();
     });
-    sock.on('error', (err) => console.error(err))
+    sock.on('error', (err) => {
+        console.error(err, '请确认skynet debug console服务端口是否已开启?, 在config.json文件可配置连接信息.')
+    })
     sock.on('close', () => console.log('socket closed.'))
     sock.on("data", (data) => {
         let str = data.toString("utf-8");
@@ -412,7 +415,7 @@
                         if (!address) return;
                         let info = svc[address];
                         if (!info) return;
-                        info.name = '[UNIQUE] ' + info.name
+                        info.unique = true
                     });
                     break;
                 case "netstat":
